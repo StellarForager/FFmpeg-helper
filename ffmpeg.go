@@ -241,7 +241,7 @@ func FetchFfmpeg() (string, error) {
 	if eq, err := verifySha256(path, asset.Digest[7:]); err != nil {
 		return "", err
 	} else if !eq {
-		// os.Remove(path)
+		os.Remove(path)
 		return "", errFileCorrupted
 	}
 	if err := chmodExec(path); err != nil {
