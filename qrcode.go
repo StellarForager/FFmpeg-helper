@@ -2,7 +2,6 @@ package ffmpeghelper
 
 import (
 	"image"
-	_ "image/jpeg"
 
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/multi/qrcode"
