@@ -17,4 +17,5 @@ func TestFfmpeg(t *testing.T) {
 	ofile, _ := os.Create("TestFfmpeg_H264M3U8GetImage.jpg")
 	defer ofile.Close()
 	jpeg.Encode(ofile, img, nil)
+	t.Log(ffmpeghelper.ImgScanQrcode(img))
 }
