@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 func getUserBinDir() string {
@@ -105,6 +106,7 @@ const userAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 " +
 	"(KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36"
 
 var (
+	httpClient             = &http.Client{}
 	errVariantIncompatible = errors.New("compatible variant not found")
 	errDownloadFailed      = errors.New("binary fetching failed")
 	errFileCorrupted       = errors.New("binary sha256 mismatch")
@@ -124,8 +126,7 @@ func fetchRelease() (*assetType, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", userAgent)
-	client := &http.Client{}
-	res, err := client.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +157,7 @@ func downloadFile(url, path string) error {
 		return err
 	}
 	req.Header.Set("User-Agent", userAgent)
-	client := &http.Client{}
-	res, err := client.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -197,6 +197,8 @@ func chmodExec(path string) error {
 	return os.Chmod(path, info.Mode()|0111)
 }
 
+var fetchFfmpegLock sync.Mutex
+
 // Download FFmpeg to the user's bin directory.
 //
 // Returns:
@@ -217,16 +219,19 @@ func FetchFfmpeg() (string, error) {
 		return "", err
 	}
 	// download the binary
+	fetchFfmpegLock.Lock()
+	defer fetchFfmpegLock.Unlock()
 	path := filepath.Join(dir, getFfmpegName(""))
 	isDownloadFailed := true
 	var dlErr error
 	// try proxies first
-	for _, url := range []string{
-		"https://ghfast.top/" + asset.BrowserDownloadUrl,
-		"https://gh-proxy.com/" + asset.BrowserDownloadUrl,
-		asset.BrowserDownloadUrl,
+	for _, proxy := range []string{
+		"https://ghfast.top/",
+		"https://gh-proxy.com/",
+		"",
 	} {
-		if err := downloadFile(url, path); err == nil {
+		if err := downloadFile(
+			proxy+asset.BrowserDownloadUrl, path); err == nil {
 			isDownloadFailed = false
 			break
 		} else {
@@ -250,9 +255,10 @@ func FetchFfmpeg() (string, error) {
 	return path, nil
 }
 
-var ffmpegPath string
-
-var errFfmpegNotFound = errors.New("cannot find executable ffmpeg")
+var (
+	ffmpegPath        string
+	errFfmpegNotFound = errors.New("cannot find executable ffmpeg")
+)
 
 // Get FFmpeg's path or download it if not yet.
 //

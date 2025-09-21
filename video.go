@@ -6,7 +6,6 @@ import (
 	"image"
 	"image/jpeg"
 	"io"
-	"net/http"
 	"os/exec"
 	"strings"
 )
@@ -18,7 +17,7 @@ var (
 
 // Get .ts url from m3u8 url
 func m3u8GetTsUrl(url string) (string, error) {
-	res, err := http.Get(url)
+	res, err := httpClient.Get(url)
 	if err != nil {
 		return "", err
 	}
