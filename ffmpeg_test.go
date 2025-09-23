@@ -1,19 +1,38 @@
 package ffmpeghelper_test
 
 import (
+	"bytes"
 	"image"
 	"image/jpeg"
 	"os"
+	"os/exec"
 	"testing"
+	"time"
 
 	ffmpeghelper "github.com/StellarForager/FFmpeg-helper"
 )
 
 func TestFfmpeg(t *testing.T) {
 	url := os.Getenv("M3U8_URL")
-	t.Log(ffmpeghelper.Ffmpeg())
+	ffmpeg, err := ffmpeghelper.Ffmpeg()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	t.Logf("ffmpeg: %v", ffmpeg)
+	cmd := exec.Command(ffmpeg, "-version")
+	stdout := &bytes.Buffer{}
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	t.Log(stdout.String())
+	ts := time.Now()
 	img, err := ffmpeghelper.H264M3U8GetImage(url)
-	t.Log(img.(*image.YCbCr).Bounds(), err)
+	te := time.Since(ts)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	t.Logf("img: %v, time: %v", img.(*image.YCbCr).Bounds(), te)
 	ofile, _ := os.Create("TestFfmpeg_H264M3U8GetImage.jpg")
 	defer ofile.Close()
 	jpeg.Encode(ofile, img, nil)

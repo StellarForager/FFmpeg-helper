@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	errTsFetchFailed = errors.New("failed to fetch ts url")
-	errTsParseFailed = errors.New("failed to parse ts url")
+	ErrTsFetchFailed = errors.New("failed to fetch ts url")
+	ErrTsParseFailed = errors.New("failed to parse ts url")
+	ErrTsReadFailed  = errors.New("failed to get ts data")
 )
 
 // Get .ts url from m3u8 url
@@ -23,7 +24,7 @@ func m3u8GetTsUrl(url string) (string, error) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return "", errTsFetchFailed
+		return "", ErrTsFetchFailed
 	}
 	body, _ := io.ReadAll(res.Body)
 	// parse the last .ts url
@@ -32,7 +33,7 @@ func m3u8GetTsUrl(url string) (string, error) {
 		ts := parts[len(parts)-1]
 		return url[:strings.LastIndex(url, "/")+1] + ts, nil
 	}
-	return "", errTsParseFailed
+	return "", ErrTsParseFailed
 }
 
 // Get a jpeg image from a H.264 M3U8 stream.
@@ -46,13 +47,24 @@ func m3u8GetTsUrl(url string) (string, error) {
 //	image.Image: the jpeg image
 //	error: error
 func H264M3U8GetImage(url string) (image.Image, error) {
+	// get ffmpeg path
 	ffmpeg, err := Ffmpeg()
 	if err != nil {
 		return nil, err
 	}
-	ts, err := m3u8GetTsUrl(url)
+	// get .ts url
+	tsUrl, err := m3u8GetTsUrl(url)
 	if err != nil {
 		return nil, err
+	}
+	// get .ts body
+	res, err := httpClient.Get(tsUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return nil, ErrTsReadFailed
 	}
 	cmd := exec.Command(
 		ffmpeg,
@@ -60,16 +72,16 @@ func H264M3U8GetImage(url string) (image.Image, error) {
 		"-flags", "low_delay", // low delay
 		"-fflags", "discardcorrupt+flush_packets", // low delay
 		"-probesize", "2048", // low delay
-		"-i", ts,
-		"-an", // no audio
-		"-pix_fmt", "yuvj420p",
-		"-vframes", "1",
-		"-f", "image2", // jpeg
-		"-g", "1",
-		"-",
+		"-i", "pipe:", // read from stdin
+		"-an",                  // no audio
+		"-pix_fmt", "yuvj420p", // source video format
+		"-vframes", "1", // 1 frame
+		"-g", "1", // force all frames to be key frames
+		"-f", "image2", // output as jpeg
+		"-", // print to stdout
 	)
 	out := &bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = out, nil
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = res.Body, out, nil
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}

@@ -272,8 +272,7 @@ func Ffmpeg() (string, error) {
 		return ffmpegPath, nil
 	}
 	// try if ffmpeg exists
-	path := GetFfmpegPath()
-	if path != "" {
+	if path := GetFfmpegPath(); path != "" {
 		ffmpegPath = path
 		return path, nil
 	}
@@ -284,7 +283,7 @@ func Ffmpeg() (string, error) {
 		return "", err
 	}
 	// re-get the path to ensure the downloaded ffmpeg is ok
-	if path = GetFfmpegPath(); path != "" {
+	if path := GetFfmpegPath(); path != "" {
 		ffmpegPath = path
 		return path, nil
 	}
