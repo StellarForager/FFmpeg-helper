@@ -61,7 +61,12 @@ func getFfmpegVariant() string {
 	case "386":
 		a = "i686"
 	case "arm":
-		a = "armhf"
+		switch o {
+		case "android":
+			a = "armv7a"
+		default:
+			a = "armhf"
+		}
 	case "arm64":
 		a = "aarch64"
 	case "loong64":
@@ -97,6 +102,10 @@ func GetFfmpegPath() string {
 	}
 	// find in os path
 	if path, err := exec.LookPath(name); err == nil {
+		return path
+	}
+	// find in the current working dir
+	if path := filepath.Join(".", name); isValidFfmpegExe(path) {
 		return path
 	}
 	return ""
