@@ -89,6 +89,13 @@ func getFfmpegName(variant string) string {
 	return name
 }
 
+func getExecDir() string {
+	if ex, err := os.Executable(); err == nil {
+		return filepath.Dir(ex)
+	}
+	return "."
+}
+
 // Get path of FFmpeg.
 //
 // Returns:
@@ -96,8 +103,8 @@ func getFfmpegName(variant string) string {
 //	string: path of the executable
 func GetFfmpegPath() string {
 	name := getFfmpegName("")
-	// find in the current working dir
-	if path := filepath.Join(".", name); isValidFfmpegExe(path) {
+	// find in the same dir
+	if path := filepath.Join(getExecDir(), name); isValidFfmpegExe(path) {
 		return path
 	}
 	// find in user bin dir
