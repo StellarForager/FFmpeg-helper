@@ -1,6 +1,6 @@
 module github.com/StellarForager/FFmpeg-helper
 
-go 1.24.6
+go 1.24.7
 
 require github.com/makiuchi-d/gozxing v0.1.1
 

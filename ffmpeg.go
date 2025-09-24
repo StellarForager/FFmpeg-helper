@@ -96,16 +96,16 @@ func getFfmpegName(variant string) string {
 //	string: path of the executable
 func GetFfmpegPath() string {
 	name := getFfmpegName("")
+	// find in the current working dir
+	if path := filepath.Join(".", name); isValidFfmpegExe(path) {
+		return path
+	}
 	// find in user bin dir
 	if path := filepath.Join(getUserBinDir(), name); isValidFfmpegExe(path) {
 		return path
 	}
 	// find in os path
-	if path, err := exec.LookPath(name); err == nil {
-		return path
-	}
-	// find in the current working dir
-	if path := filepath.Join(".", name); isValidFfmpegExe(path) {
+	if path, err := exec.LookPath(name); err == nil && isValidFfmpegExe(path) {
 		return path
 	}
 	return ""
