@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -298,9 +297,9 @@ func Ffmpeg() (string, error) {
 		return path, nil
 	}
 	// download ffmpeg
-	fmt.Println("downloading FFmpeg...")
+	os.Stdout.WriteString("FFmpeg downloading...\n")
 	if _, err := FetchFfmpeg(); err != nil {
-		fmt.Println("download failed")
+		os.Stderr.WriteString("FFmpeg download faild\n")
 		return "", err
 	}
 	// re-get the path to ensure the downloaded ffmpeg is ok
