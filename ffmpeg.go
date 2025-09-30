@@ -102,18 +102,23 @@ func getExecDir() string {
 //
 //	string: path of the executable
 func GetFfmpegPath() string {
-	name := getFfmpegName("")
-	// find in the same dir
-	if path := filepath.Join(getExecDir(), name); isValidFfmpegExe(path) {
-		return path
+	names := []string{getFfmpegName("")}
+	if runtime.GOOS == "android" {
+		names = append(names, "libffmpeg.so")
 	}
-	// find in user bin dir
-	if path := filepath.Join(getUserBinDir(), name); isValidFfmpegExe(path) {
-		return path
-	}
-	// find in os path
-	if path, err := exec.LookPath(name); err == nil && isValidFfmpegExe(path) {
-		return path
+	for _, name := range names {
+		if path := filepath.Join(getExecDir(), name); isValidFfmpegExe(path) {
+			// find in the same dir
+			return path
+		} else if path := filepath.Join(
+			getUserBinDir(), name); isValidFfmpegExe(path) {
+			// find in user bin dir
+			return path
+		} else if path, err := exec.LookPath(
+			name); err == nil && isValidFfmpegExe(path) {
+			// find in os path
+			return path
+		}
 	}
 	return ""
 }
