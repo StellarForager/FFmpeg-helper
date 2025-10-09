@@ -1,9 +1,9 @@
 package ffmpeghelper
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
+	"bytes"
+	"crypto/md5"
+	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 )
 
@@ -126,50 +125,10 @@ const userAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 " +
 	"(KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36"
 
 var (
-	httpClient             = &http.Client{}
-	errVariantIncompatible = errors.New("compatible variant not found")
-	errDownloadFailed      = errors.New("binary fetching failed")
-	errFileCorrupted       = errors.New("binary sha256 mismatch")
+	httpClient        = &http.Client{}
+	errDownloadFailed = errors.New("binary fetching failed")
+	errFileCorrupted  = errors.New("binary sha256 mismatch")
 )
-
-type assetType struct {
-	Name               string `json:"name"`
-	Digest             string `json:"digest"`
-	BrowserDownloadUrl string `json:"browser_download_url"`
-}
-
-func fetchRelease() (*assetType, error) {
-	// get the latest release
-	const url = "https://api.github.com/repos/StellarForager/FFmpeg/releases/latest"
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		body, _ := io.ReadAll(res.Body)
-		return nil, errors.New(string(body))
-	}
-	var data1 struct {
-		Assets []assetType `json:"assets"` // emptiable
-	}
-	if err := json.NewDecoder(res.Body).Decode(&data1); err != nil {
-		return nil, err
-	}
-	// return a matching variant's info
-	vName := getFfmpegName(getFfmpegVariant())
-	for _, a := range data1.Assets {
-		if a.Name == vName {
-			return &a, nil
-		}
-	}
-	return nil, nil
-}
 
 func downloadFile(url, path string) error {
 	req, err := http.NewRequest("GET", url, nil)
@@ -191,21 +150,36 @@ func downloadFile(url, path string) error {
 		return err
 	}
 	defer file.Close()
-	_, err = io.Copy(file, res.Body)
-	return err
+	if _, err := io.Copy(file, res.Body); err != nil {
+		return err
+	}
+	// verify hash
+	if v, ok := res.Header["X-Ms-Blob-Content-Md5"]; ok {
+		if sum, err := base64.StdEncoding.DecodeString(v[0]); err == nil {
+			if eq, err := verifyMd5(path, sum); eq {
+				return nil
+			} else {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return errFileCorrupted
 }
 
-func verifySha256(path, digest string) (bool, error) {
+func verifyMd5(path string, sum []byte) (bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return false, err
 	}
 	defer file.Close()
-	sh := sha256.New()
-	if _, err := io.Copy(sh, file); err != nil {
+	hasher := md5.New()
+	if _, err := io.Copy(hasher, file); err != nil {
 		return false, err
 	}
-	return strings.EqualFold(hex.EncodeToString(sh.Sum(nil)), digest), nil
+	fsum := hasher.Sum(nil)
+	return bytes.Equal(sum, fsum), nil
 }
 
 func chmodExec(path string) error {
@@ -227,12 +201,9 @@ var fetchFfmpegLock sync.Mutex
 //	error: error
 func FetchFfmpeg() (string, error) {
 	// get a matching variant from the latest release
-	asset, err := fetchRelease()
-	if err != nil {
-		return "", err
-	} else if asset == nil {
-		return "", errVariantIncompatible
-	}
+	url :=
+		"https://github.com/StellarForager/FFmpeg/releases/latest/download/" +
+			getFfmpegName(getFfmpegVariant())
 	// create dir
 	dir := getUserBinDir()
 	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsExist(err) {
@@ -251,24 +222,18 @@ func FetchFfmpeg() (string, error) {
 		"",
 	} {
 		if err := downloadFile(
-			proxy+asset.BrowserDownloadUrl, path); err == nil {
+			proxy+url, path); err == nil {
 			isDownloadFailed = false
 			break
 		} else {
 			dlErr = err
-			os.Remove(path)
 		}
 	}
 	if isDownloadFailed {
+		os.Remove(path)
 		return "", dlErr
 	}
-	// verify hash, strip leading "sha256:" from the digest
-	if eq, err := verifySha256(path, asset.Digest[7:]); err != nil {
-		return "", err
-	} else if !eq {
-		os.Remove(path)
-		return "", errFileCorrupted
-	}
+	// chmod +x
 	if err := chmodExec(path); err != nil {
 		return "", err
 	}
