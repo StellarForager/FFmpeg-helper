@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 )
 
 func getUserBinDir() string {
@@ -125,7 +126,7 @@ const userAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 " +
 	"(KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36"
 
 var (
-	httpClient        = &http.Client{}
+	httpClient        = &http.Client{Timeout: time.Minute * 15}
 	errDownloadFailed = errors.New("binary fetching failed")
 	errFileCorrupted  = errors.New("binary sha256 mismatch")
 )
